@@ -62,27 +62,77 @@ void checkAnalog() {
 }
 
 void checkMusic() {
+
+
+  const uint32_t nowUs = micros();
+  if ((uint32_t)(nowUs - sampleTmrUs) < 1000) return;   // 1 kHz
+  sampleTmrUs = nowUs;
+
   vol.tick();
   yield();
+
 #if (USE_CLAP == 1)
-  clap.tick(vol.getRawMax());
-  if (clap.hasClaps(2)) controlHandler(!cfg.state);
-#endif
-  if (CUR_PRES.advMode == GL_ADV_LOW || CUR_PRES.advMode == GL_ADV_HIGH) {   // частоты
-    int raw[FFT_SIZE], spectr[FFT_SIZE];
-    for (int i = 0; i < FFT_SIZE; i++) raw[i] = analogRead(A0);
-    yield();
-    FFT(raw, spectr);
-    int low_raw = 0;
-    int high_raw = 0;
-    for (int i = 0; i < FFT_SIZE / 2; i++) {
-      spectr[i] = (spectr[i] * (i + 2)) >> 1;
-      if (i < 2) low_raw += spectr[i];
-      else high_raw += spectr[i];
+  const int v = vol.getRawMax();
+  const uint32_t nowMs = millis();
+
+  // your work time condition
+  bool work = isWorkTime(now.hour, cfg.workFrom, cfg.workTo);
+
+  // simple smoothing (very important when lamp is ON)
+  //levelFilt = (levelFilt * 7 + v) >> 3;
+
+  const int SOUND_TRSH = 100;                // <-- tune this
+  const int SOUND_TRSH_ON = 150;                // <-- tune this
+  const uint16_t RETRIG_DELAY = 300;         // ms
+  const uint32_t AUTO_OFF_TIME = 600000UL;//600000UL;  // 10 min
+  // Serial.print("Sound clean: ");
+  // Serial.print(v);
+  // Serial.print(" Sound: ");
+  // Serial.print(levelFilt);
+  // Serial.print(" AUTO_OFF_TIME 10000: ");
+  // Serial.print((uint32_t)(nowMs - lastSoundMs));
+  // Serial.print("\n");
+  // detect "loud enough"
+  if (v >= SOUND_TRSH && (uint32_t)(nowMs - retrigMs) >= RETRIG_DELAY) {
+    retrigMs = nowMs;
+    lastSoundMs = nowMs;
+    // Serial.print("SOUND WAS DETECTED");
+    // turn ON only during allowed time
+    if (!cfg.state && work && v >= SOUND_TRSH_ON) {
+      Serial.println("sound -> ON");
+      controlHandler(true);
+      soundActivated = true;
     }
-    low.tick(low_raw);
-    high.tick(high_raw);
   }
+
+  // auto OFF only if it was turned on by sound
+  if (soundActivated && cfg.state && (uint32_t)(nowMs - lastSoundMs) >= AUTO_OFF_TIME) {
+    Serial.println("sound timeout -> OFF");
+    controlHandler(false);
+    soundActivated = true;
+    lastSoundMs = nowMs;
+  }
+
+  // reset flag if turned off manually
+  if (!cfg.state) {
+    soundActivated = true;
+  }
+#endif
+  // if (CUR_PRES.advMode == GL_ADV_LOW || CUR_PRES.advMode == GL_ADV_HIGH) {   // частоты
+  //   int raw[FFT_SIZE], spectr[FFT_SIZE];
+  //   for (int i = 0; i < FFT_SIZE; i++) raw[i] = analogRead(A0);
+  //   yield();
+  //   FFT(raw, spectr);
+  //   int low_raw = 0;
+  //   int high_raw = 0;
+  //   for (int i = 0; i < FFT_SIZE / 2; i++) {
+  //     spectr[i] = (spectr[i] * (i + 2)) >> 1;
+  //     if (i < 2) low_raw += spectr[i];
+  //     else high_raw += spectr[i];
+  //   }
+  //   low.tick(low_raw);
+  //   high.tick(high_raw);
+  // }
 }
 
 void checkPhot() {
