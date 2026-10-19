@@ -18,6 +18,7 @@ void iAmOnline() {
     packet += cfg.curPreset;
     sendUDP(reply);
   }
+  //digitalWrite(2, HIGH);
 }
 
 void restartUDP() {

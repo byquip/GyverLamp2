@@ -274,12 +274,20 @@ void effectsRoutine() {
   if (btnClicks > 0) fill_solid(leds, btnClicks, CRGB::White);
   if (brTicks > 0) fill_solid(leds, brTicks, CRGB::Cyan);
   yield();
+  #if (USE_CLAP == 1)
+    vol.tick();
+    clap.tick(vol.getRawMax());
+  #endif
   FastLED.show();
+  #if (USE_CLAP == 1)
+  vol.tick();
+  clap.tick(vol.getRawMax());
+  #endif
 }
 
 // ====================================================================================================================
 bool musicMode() {
-  return ((cfg.adcMode == GL_ADC_MIC || cfg.adcMode == GL_ADC_BOTH) && (CUR_PRES.advMode > 1 && CUR_PRES.advMode <= 4));
+  return (false && (cfg.adcMode == GL_ADC_MIC || cfg.adcMode == GL_ADC_BOTH) && (CUR_PRES.advMode > 1 && CUR_PRES.advMode <= 4));
 }
 bool briMode() {
   return (cfg.adcMode == GL_ADC_BRI || cfg.adcMode == GL_ADC_BOTH);

@@ -65,10 +65,10 @@ struct Palette {
 
 #define CFG_SIZE 12
 struct Config {
-  byte bright = 100;      // яркость
-  byte adcMode = 1;       // режим ацп (1 выкл, 2 ярк, 3 муз)
+  byte bright = 40;      // яркость
+  byte adcMode = 3;       // режим ацп (1 выкл, 2 ярк, 3 муз)
   byte minBright = 0;     // мин яркость
-  byte maxBright = 255;   // макс яркость
+  byte maxBright = 100;   // макс яркость
   byte rotation = 0;      // смена режимов: 0 ручная, 1 авто
   byte rotRnd = 0;        // тип автосмены: 0 в порядке, 1 рандом
   byte rotPeriod = 1;     // период смены (1,5..)
@@ -78,8 +78,8 @@ struct Config {
   byte workTo = 0;        // часы работы (0,1.. 23)
   byte matrix = 1;        // тип матрицы 1.. 8
 
-  int16_t length = 16;    // длина ленты
-  int16_t width = 16;     // ширина матрицы
+  int16_t length = 48;    // длина ленты
+  int16_t width = 24;     // ширина матрицы
 
   byte GMT = 16;          // часовой пояс +13
   uint32_t cityID = 1;    // city ID
@@ -93,14 +93,14 @@ struct Config {
   byte state = 1;         // состояние 0 выкл, 1 вкл
   byte group = 1;         // группа девайса (1-10)
   byte role = 0;          // 0 slave, 1 master
-  byte WiFimode = 0;      // 0 AP, 1 local
-  byte presetAmount = 1;  // количество режимов
+  byte WiFimode = 1;      // 0 AP, 1 local
+  byte presetAmount = 40;  // количество режимов
   byte manualOff = 0;     // выключали вручную?
   int8_t curPreset = 0;   // текущий режим
   int16_t minLight = 0;   // мин освещённость
   int16_t maxLight = 1023;// макс освещённость
-  char ssid[32];          // логин wifi
-  char pass[32];          // пароль wifi
+  char ssid[32] = "";          // логин wifi
+  char pass[32] = "";          // пароль wifi
   byte version = GL_VERSION;
   byte update = 0;
 };

@@ -71,9 +71,11 @@ void setPower(bool state) {
   }
   if (millis() - udpTmr >= 1000) sendToSlaves(0, cfg.state); // пиздец костыль (не отправлять слейвам если команда получена по воздуху)
   DEBUGLN(state ? "Power on" : "Power off");
+  digitalWrite(2, HIGH);
 }
 
 void fadeDown(uint32_t time) {
   turnoffTmr.setInterval(time);
   turnoffTmr.restart();
+  digitalWrite(2, HIGH);
 }
