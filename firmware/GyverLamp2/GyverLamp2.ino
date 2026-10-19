@@ -39,7 +39,7 @@
 
 // ------------ Лента -------------
 #define STRIP_PIN 2         // пин ленты GPIO2 (D4 на wemos/node), GPIO5 (D1) для module
-#define MAX_LEDS 300        // макс. светодиодов
+#define MAX_LEDS 1152        // макс. светодиодов
 #define STRIP_CHIP WS2812   // чип ленты
 #define STRIP_COLOR GRB     // порядок цветов в ленте
 #define STRIP_VOLT 5        // напряжение ленты, V
@@ -66,26 +66,26 @@ const char WiFiPassword[] = "12345678";
 // ------------ БИЛДЕР -------------
 #define GL_BUILD 0  // 0: com 300, 1: com 900, 2: esp1 300, 3: esp1 900, 4: module 300, 5: module 900
 
-#if (GL_BUILD == 0)
-#elif (GL_BUILD == 1)
-#define MAX_LEDS 900
-#elif (GL_BUILD == 2)
-#define MAX_LEDS 300
-#define BTN_PIN 0
-#define STRIP_PIN 2
-#define USE_ADC 0
-#elif (GL_BUILD == 3)
-#define MAX_LEDS 900
-#define BTN_PIN 0
-#define STRIP_PIN 2
-#define USE_ADC 0
-#elif (GL_BUILD == 4)
-#define MAX_LEDS 300
-#define STRIP_PIN 5
-#elif (GL_BUILD == 5)
-#define MAX_LEDS 900
-#define STRIP_PIN 5
-#endif
+// #if (GL_BUILD == 0)
+// #elif (GL_BUILD == 1)
+// #define MAX_LEDS 900
+// #elif (GL_BUILD == 2)
+// #define MAX_LEDS 300
+// #define BTN_PIN 0
+// #define STRIP_PIN 2
+// #define USE_ADC 0
+// #elif (GL_BUILD == 3)
+// #define MAX_LEDS 900
+// #define BTN_PIN 0
+// #define STRIP_PIN 2
+// #define USE_ADC 0
+// #elif (GL_BUILD == 4)
+// #define MAX_LEDS 300
+// #define STRIP_PIN 5
+// #elif (GL_BUILD == 5)
+// #define MAX_LEDS 900
+// #define STRIP_PIN 5
+// #endif
 
 // ---------- БИБЛИОТЕКИ -----------
 //#define FASTLED_ALLOW_INTERRUPTS 0
@@ -121,7 +121,7 @@ CRGB leds[MAX_LEDS];
 Time now;
 Button btn(BTN_PIN);
 timerMillis EEtmr(EE_TOUT), turnoffTmr, connTmr(120000ul), dawnTmr, holdPresTmr(30000ul), blinkTmr(300);
-timerMillis effTmr(30, true), onlineTmr(500, true), postDawn(10 * 60000ul);
+timerMillis effTmr(40, true), onlineTmr(500, true), postDawn(10 * 60000ul);
 TimeRandom trnd;
 VolAnalyzer vol(A0), low, high;
 FastFilter phot;
@@ -135,6 +135,11 @@ bool gotNTP = false, gotTime = false;
 bool loading = true;
 int udpLength = 0;
 byte udpScale = 0, udpBright = 0;
+static uint32_t sampleTmrUs = 0;
+static uint32_t lastSoundMs = 0;
+static uint32_t retrigMs = 0;
+static uint16_t levelFilt = 0;
+static bool soundActivated = false;
 
 // ------------------- SETUP --------------------
 void setup() {
@@ -157,10 +162,18 @@ void setup() {
 #endif
   setupADC();           // настраиваем анализ
   presetRotation(true); // форсировать смену режима
+
+  pinMode(13, OUTPUT);
+  digitalWrite(13, 1);
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(2, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+  digitalWrite(2, HIGH);
 }
 
 void loop() {
   timeTicker();       // обновляем время
+  checkAnalog();
   yield();
 #ifndef SKIP_WIFI
   tryReconnect();     // пробуем переподключиться если WiFi упал
@@ -170,10 +183,11 @@ void loop() {
 #endif
   checkEEupdate();    // сохраняем епром
   presetRotation(0);  // смена режимов по расписанию
+  checkAnalog();      // чтение звука и датчика
   effectsRoutine();   // мигаем
   yield();
-  button();           // проверяем кнопку
   checkAnalog();      // чтение звука и датчика
+  button();           // проверяем кнопку
   yield();
   iAmOnline();
 }
