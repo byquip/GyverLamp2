@@ -2,88 +2,145 @@
 #include <Arduino.h>
 
 class Clap {
-  public:
-    void tick(int val) {
-      if (millis() - _tmr >= 10) {
-        _tmr = millis();
-        int der = val - _prevVal;
+public:
+    // Call as often as possible with the latest sample
+    inline void tick(int val) {
+        const uint32_t now = micros();
+
+        // fixed sample period
+        if ((uint32_t)(now - _sampleTmr) < _sampleUs) return;
+        _sampleTmr = now;
+
+        const int der = val - _prevVal;
         _prevVal = val;
-        int signal = 0;
-        int front = 0;
+
+        int8_t signal = 0;
         if (der > _trsh) signal = 1;
-        if (der < -_trsh) signal = -1;
-        if (_prevSignal == 0 && signal == 1) front = 1;
-        if (_prevSignal == 0 && signal == -1) front = -1;
+        else if (der < -_trsh) signal = -1;
+
+        int8_t front = 0;
+        if (_prevSignal == 0) front = signal;
         _prevSignal = signal;
 
-        uint32_t deb = millis() - _tmr2;
+        const uint32_t dt = now - _eventTmr;
 
-        if (front == 1 && _state == 0) {
-          _state = 1;
-          if (!_startClap) {
-            _claps = 0;
-            _ready = 0;
-          }
-          _startClap = 1;
-          _clap = 0;
-          _tmr2 = millis();
-        } else if (front == -1 && _state == 1 && deb <= 200) {
-          _state = 2;
-          _tmr2 = millis();
-        } else if (front == 0 && _state == 2 && deb <= 200) {
-          _state = 0;
-          _claps++;
-          _clap = 1;
-          _tmr2 = millis();
-        } else if (_startClap && deb > _tout) {
-          _state = 0;
-          _startClap = 0;
-          if (_claps != 0) _ready = 1;
+        switch (_state) {
+            case 0: // idle, wait for rising edge
+                if (front == 1) {
+                    _state = 1;
+                    if (!_startClap) {
+                        _claps = 0;
+                        _ready = false;
+                    }
+                    _startClap = true;
+                    _clap = false;
+                    _eventTmr = now;
+                }
+                break;
+
+            case 1: // got positive front, wait for negative front
+                if (front == -1) {
+                    if (dt <= _pulseWindowUs) {
+                        _state = 2;
+                        _eventTmr = now;
+                    } else {
+                        _state = 0;
+                    }
+                } else if (dt > _pulseWindowUs) {
+                    _state = 0;
+                }
+                break;
+
+            case 2: // got negative front, wait for signal to settle
+                if (front == 0) {
+                    if (dt <= _pulseWindowUs) {
+                        _state = 0;
+                        ++_claps;
+                        _clap = true;
+                        _eventTmr = now;
+                    } else {
+                        _state = 0;
+                    }
+                } else if (dt > _pulseWindowUs) {
+                    _state = 0;
+                }
+                break;
         }
-      }
-    }
-    void setTrsh(int trsh) {
-      _trsh = trsh;
-    }
-    void setTimeout(int tout) {
-      _tout = tout;
-    }
-    bool isClap() {
-      if (_clap) {
-        _clap = 0;
-        return 1;
-      }
-      return 0;
-    }
-    bool hasClaps(byte claps) {
-      if (_ready && _claps == claps) {
-        _ready = 0;
-        _claps = 0;
-        return 1;
-      }
-      return 0;
-    }
-    bool hasClaps() {
-      return _ready;
-    }
-    byte getClaps() {
-      if (_ready) {
-        _ready = 0;
-        byte buf = _claps;
-        _claps = 0;
-        return buf;
-      } return 0;
+
+        if (_startClap && (uint32_t)(now - _eventTmr) > _toutUs) {
+            _state = 0;
+            _startClap = false;
+            if (_claps) _ready = true;
+        }
     }
 
-  private:
-    uint32_t _tmr = 0, _tmr2 = 0;
+    inline void setTrsh(int trsh) {
+        _trsh = trsh;
+    }
+
+    // timeout between clap series, in ms
+    inline void setTimeout(uint16_t toutMs) {
+        _toutUs = (uint32_t)toutMs * 1000UL;
+    }
+
+    // sample period, in us
+    inline void setSampleUs(uint16_t us) {
+        _sampleUs = us;
+    }
+
+    // pulse window for one clap shape, in ms
+    inline void setPulseWindow(uint16_t ms) {
+        _pulseWindowUs = (uint32_t)ms * 1000UL;
+    }
+
+    inline bool isClap() {
+        if (_clap) {
+            _clap = false;
+            return true;
+        }
+        return false;
+    }
+
+    inline bool hasClaps(uint8_t claps) {
+        if (_ready && _claps == claps) {
+            _ready = false;
+            _claps = 0;
+            return true;
+        }
+        return false;
+    }
+
+    inline bool hasClaps() const {
+        return _ready;
+    }
+
+    inline uint8_t getClaps() {
+        if (_ready) {
+            _ready = false;
+            const uint8_t n = _claps;
+            _claps = 0;
+            return n;
+        }
+        return 0;
+    }
+
+private:
+    uint32_t _sampleTmr = 0;
+    uint32_t _eventTmr = 0;
+
     int _prevVal = 0;
     int _trsh = 150;
-    byte _state = 0;
+
+    uint32_t _sampleUs = 1000UL;        // 1 ms sampling
+    uint32_t _pulseWindowUs = 120000UL; // 120 ms
+    uint32_t _toutUs = 700000UL;        // 700 ms
+
+    uint8_t _state = 0;
+    uint8_t _claps = 0;
+
     int8_t _prevSignal = 0;
-    int _tout = 700;
-    byte _claps = 0;
-    bool _ready = 0;
-    bool _clap = 0;
-    bool _startClap = 0;
+
+    bool _ready = false;
+    bool _clap = false;
+    bool _startClap = false;
 };
