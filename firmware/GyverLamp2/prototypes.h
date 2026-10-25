@@ -58,6 +58,7 @@ void shiftUp();
 void drawFrame(int pcnt);
 
 // mqtt.ino
+extern uint32_t lastMqttReconnect;
 void buildMqttTopics();
 void setupMQTT();
 bool mqttReconnect();

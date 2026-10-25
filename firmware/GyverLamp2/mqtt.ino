@@ -8,7 +8,7 @@ char mqttTopicTimezone[48];
 char mqttTopicDiscovery[60];
 char mqttClientId[20];
 
-static uint32_t lastMqttReconnect = 0;
+uint32_t lastMqttReconnect = 0;
 
 const char* effectNames[] = {
   "Perlin", "Color", "ColorChange", "Gradient", "Particles",

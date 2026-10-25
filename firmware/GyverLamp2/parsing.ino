@@ -118,6 +118,9 @@ void parsing() {
         else if (cfg.adcMode == GL_ADC_MIC) switchToMic();
         else disableADC();
         EE_updCfg();
+        mqttClient.disconnect();
+        setupMQTT();
+        lastMqttReconnect = 0;
         mqttPublishState();
         break;
 
