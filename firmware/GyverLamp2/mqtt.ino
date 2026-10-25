@@ -10,6 +10,19 @@ char mqttClientId[20];
 
 uint32_t lastMqttReconnect = 0;
 
+#define MQTT_LOG_SIZE 10
+#define MQTT_LOG_LEN 96
+char mqttLog[MQTT_LOG_SIZE][MQTT_LOG_LEN];
+byte mqttLogIdx = 0;
+byte mqttLogCount = 0;
+
+void mqttLogAdd(const char* msg) {
+  strncpy(mqttLog[mqttLogIdx], msg, MQTT_LOG_LEN - 1);
+  mqttLog[mqttLogIdx][MQTT_LOG_LEN - 1] = 0;
+  mqttLogIdx = (mqttLogIdx + 1) % MQTT_LOG_SIZE;
+  if (mqttLogCount < MQTT_LOG_SIZE) mqttLogCount++;
+}
+
 const char* effectNames[] = {
   "Perlin", "Color", "ColorChange", "Gradient", "Particles",
   "Fire", "Fire2020", "Confetti", "Vortex", "Clock", "Weather"
@@ -29,6 +42,7 @@ void buildMqttTopics() {
 void setupMQTT() {
   if (!cfg.mqtt || cfg.mqttHost[0] == 0) return;
   buildMqttTopics();
+  mqttClient.setBufferSize(512);
   mqttClient.setServer(cfg.mqttHost, cfg.mqttPort > 0 ? cfg.mqttPort : 1883);
   mqttClient.setCallback(mqttCallback);
   mqttClient.setKeepAlive(60);
@@ -54,6 +68,7 @@ bool mqttReconnect() {
 
   if (connected) {
     DEBUGLN("OK");
+    mqttLogAdd(">> Connected to broker");
     mqttClient.publish(mqttTopicAvail, "online", true);
     mqttClient.subscribe(mqttTopicSet);
     char subTopic[45];
@@ -67,6 +82,9 @@ bool mqttReconnect() {
   }
 
   DEBUG("FAIL rc="); DEBUGLN(mqttClient.state());
+  char logBuf[MQTT_LOG_LEN];
+  snprintf(logBuf, sizeof(logBuf), ">> Connect FAIL rc=%d", mqttClient.state());
+  mqttLogAdd(logBuf);
   return false;
 }
 
@@ -116,6 +134,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   msg[len] = 0;
 
   DEBUG("MQTT << "); DEBUG(topic); DEBUG(" : "); DEBUGLN(msg);
+  {
+    char logBuf[MQTT_LOG_LEN];
+    const char* shortTopic = strrchr(topic, '/');
+    snprintf(logBuf, sizeof(logBuf), "<< %s: %s", shortTopic ? shortTopic + 1 : topic, msg);
+    mqttLogAdd(logBuf);
+  }
 
   if (strcmp(topic, mqttTopicPresence) == 0) {
     handlePresenceMessage((byte*)msg, len);
@@ -206,7 +230,11 @@ void mqttPublishState() {
     cfg.presenceEnabled ? "ON" : "OFF"
   );
 
-  mqttClient.publish(mqttTopicState, payload, true);
+  if (mqttClient.publish(mqttTopicState, payload, true)) {
+    mqttLogAdd(">> State published");
+  } else {
+    mqttLogAdd(">> State publish FAILED (buf?)");
+  }
 }
 
 // ---- HA Auto-Discovery helpers ----
@@ -282,7 +310,11 @@ void mqttPublishDiscovery() {
     mqttClientId, deviceId
   );
 
-  mqttClient.publish(mqttTopicDiscovery, payload, true);
+  if (mqttClient.publish(mqttTopicDiscovery, payload, true)) {
+    mqttLogAdd(">> Discovery published");
+  } else {
+    mqttLogAdd(">> Discovery FAILED (buf?)");
+  }
   yield();
 
   mqttDiscNumber("Speed", "speed", 0, 255, "mdi:speedometer");

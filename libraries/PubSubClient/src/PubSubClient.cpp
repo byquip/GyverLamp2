@@ -204,42 +204,39 @@ boolean PubSubClient::connect(const char *id, const char *user, const char *pass
 
         if (result == 1) {
             nextMsgId = 1;
-            uint8_t d[9] = {0x00,0x04,'M','Q','T','T',MQTT_VERSION};
-            d[7] = 0x00;
-            if (cleanSession) d[7] |= 0x02;
-
-            if (willTopic) {
-                d[7] |= 0x04;
-                d[7] |= (willQos << 3);
-                if (willRetain) d[7] |= 0x20;
-            }
-
-            if(user != NULL) {
-                d[7] |= 0x80;
-                if(pass != NULL) {
-                    d[7] |= 0x40;
-                }
-            }
-
-            d[8] = ((this->keepAlive) >> 8);
-
-            uint16_t length = 5;
+            uint16_t length = MQTT_MAX_HEADER_SIZE;
             unsigned int j;
 
 #if MQTT_VERSION == MQTT_VERSION_3_1
-            d[0] = 0x00;
-            d[1] = 0x06;
-            d[2] = 'M';
-            d[3] = 'Q';
-            d[4] = 'I';
-            d[5] = 's';
-            d[6] = 'd';
-            d[7] = 'p';
-            d[8] = MQTT_VERSION;
-            d[9] = d[7];
-            d[10] = d[8];
-            length = 7;
+            uint8_t d[9] = {0x00,0x06,'M','Q','I','s','d','p',MQTT_VERSION};
+#define MQTT_HEADER_VERSION_LENGTH 9
+#elif MQTT_VERSION == MQTT_VERSION_3_1_1
+            uint8_t d[7] = {0x00,0x04,'M','Q','T','T',MQTT_VERSION};
+#define MQTT_HEADER_VERSION_LENGTH 7
 #endif
+            for (j = 0; j < MQTT_HEADER_VERSION_LENGTH; j++) {
+                this->buffer[length++] = d[j];
+            }
+
+            uint8_t v;
+            if (willTopic) {
+                v = 0x04 | (willQos << 3) | (willRetain << 5);
+            } else {
+                v = 0x00;
+            }
+            if (cleanSession) {
+                v = v | 0x02;
+            }
+            if (user != NULL) {
+                v = v | 0x80;
+                if (pass != NULL) {
+                    v = v | (0x80 >> 1);
+                }
+            }
+            this->buffer[length++] = v;
+
+            this->buffer[length++] = ((this->keepAlive) >> 8);
+            this->buffer[length++] = ((this->keepAlive) & 0xFF);
 
             CHECK_STRING_LENGTH(length, id)
             length = writeString(id, this->buffer, length);
@@ -250,16 +247,16 @@ boolean PubSubClient::connect(const char *id, const char *user, const char *pass
                 length = writeString(willMessage, this->buffer, length);
             }
 
-            if(user != NULL) {
+            if (user != NULL) {
                 CHECK_STRING_LENGTH(length, user)
                 length = writeString(user, this->buffer, length);
             }
-            if(pass != NULL) {
+            if (pass != NULL) {
                 CHECK_STRING_LENGTH(length, pass)
                 length = writeString(pass, this->buffer, length);
             }
 
-            write(MQTTCONNECT, this->buffer, length-5);
+            write(MQTTCONNECT, this->buffer, length-MQTT_MAX_HEADER_SIZE);
             lastInActivity = lastOutActivity = millis();
             while (!_client->available()) {
                 unsigned long t = millis();
@@ -525,9 +522,9 @@ boolean PubSubClient::beginPublish(const char* topic, unsigned int plength, bool
             header |= 1;
         }
         size_t hlen = buildHeader(header, this->buffer, plength+length-5);
-        uint16_t rc = _client->write(this->buffer+(4-hlen),length+hlen-4);
+        uint16_t rc = _client->write(this->buffer+(MQTT_MAX_HEADER_SIZE-hlen),length+hlen-MQTT_MAX_HEADER_SIZE);
         lastOutActivity = millis();
-        return (rc == (length+hlen-4));
+        return (rc == (length+hlen-MQTT_MAX_HEADER_SIZE));
     }
     return false;
 }
@@ -574,7 +571,7 @@ boolean PubSubClient::write(uint8_t header, uint8_t* buf, uint16_t length) {
     uint8_t hlen = buildHeader(header, buf, length);
 
 #ifdef MQTT_MAX_TRANSFER_SIZE
-    uint8_t* writeBuf = buf+(4-hlen);
+    uint8_t* writeBuf = buf+(MQTT_MAX_HEADER_SIZE-hlen);
     uint16_t bytesRemaining = length+hlen;
     uint8_t bytesToWrite;
     boolean result = true;
@@ -588,7 +585,7 @@ boolean PubSubClient::write(uint8_t header, uint8_t* buf, uint16_t length) {
     }
     return result;
 #else
-    rc = _client->write(buf+(4-hlen), length+hlen);
+    rc = _client->write(buf+(MQTT_MAX_HEADER_SIZE-hlen), length+hlen);
     lastOutActivity = millis();
     return (rc == hlen+length);
 #endif

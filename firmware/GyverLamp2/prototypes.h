@@ -59,6 +59,10 @@ void drawFrame(int pcnt);
 
 // mqtt.ino
 extern uint32_t lastMqttReconnect;
+extern char mqttLog[][96];
+extern byte mqttLogIdx;
+extern byte mqttLogCount;
+void mqttLogAdd(const char* msg);
 void buildMqttTopics();
 void setupMQTT();
 bool mqttReconnect();
@@ -78,6 +82,7 @@ void handleStatusPage();
 void handleOTAPage();
 void handleMqttPage();
 void handleMqttSave();
+void handleMqttLog();
 void setupWebOTA();
 
 // parsing.ino

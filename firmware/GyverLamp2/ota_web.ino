@@ -161,11 +161,19 @@ a:hover{text-decoration:underline}
 </div>
 </form>
 <div id="result"></div>
+<div class="card" style="margin-top:12px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span style="font-size:.9em;color:#aaa" id="lLog"></span>
+<span style="font-size:.75em;color:#555" id="logAge"></span>
+</div>
+<pre id="logBox" style="background:#0a0e1a;border-radius:8px;padding:10px;font-size:.78em;color:#8f8;min-height:60px;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-family:monospace"></pre>
+</div>
 <p style="text-align:center;margin-top:16px;font-size:.8em;color:#555"><a href="/">&larr; <span id="lBack"></span></a></p>
 <script>
 var L=navigator.language&&navigator.language.startsWith('ru')?'ru':'en';
 var T={
 subtitle:{ru:'MQTT / Home Assistant',en:'MQTT / Home Assistant'},
+log:{ru:'MQTT Лог',en:'MQTT Log'},
 enable:{ru:'MQTT включён',en:'MQTT Enabled'},
 host:{ru:'Сервер (IP или hostname)',en:'Broker (IP or hostname)'},
 port:{ru:'Порт',en:'Port'},
@@ -185,6 +193,15 @@ document.getElementById('lPass').textContent=t('pass');
 document.getElementById('lPassHint').textContent=t('passHint');
 document.getElementById('saveBtn').textContent=t('save');
 document.getElementById('lBack').textContent=t('back');
+document.getElementById('lLog').textContent=t('log');
+function fetchLog(){
+fetch('/mqtt/log').then(function(r){return r.text()}).then(function(d){
+var b=document.getElementById('logBox');
+b.textContent=d||'(empty)';
+b.scrollTop=b.scrollHeight;
+document.getElementById('logAge').textContent=new Date().toLocaleTimeString();
+}).catch(function(){});}
+fetchLog();setInterval(fetchLog,3000);
 </script></body></html>)rawliteral";
 
 const char STATUS_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
@@ -313,11 +330,26 @@ void handleMqttSave() {
   webServer.send(302, "text/plain", "Saved");
 }
 
+void handleMqttLog() {
+  if (!checkWebAuth()) return;
+  String out;
+  out.reserve(MQTT_LOG_SIZE * MQTT_LOG_LEN);
+  byte count = mqttLogCount < MQTT_LOG_SIZE ? mqttLogCount : MQTT_LOG_SIZE;
+  byte start = (mqttLogIdx - count + MQTT_LOG_SIZE) % MQTT_LOG_SIZE;
+  for (byte i = 0; i < count; i++) {
+    byte idx = (start + i) % MQTT_LOG_SIZE;
+    out += mqttLog[idx];
+    out += '\n';
+  }
+  webServer.send(200, "text/plain", out);
+}
+
 void setupWebOTA() {
   webServer.on("/", HTTP_GET, handleStatusPage);
 
   webServer.on("/mqtt", HTTP_GET, handleMqttPage);
   webServer.on("/mqtt", HTTP_POST, handleMqttSave);
+  webServer.on("/mqtt/log", HTTP_GET, handleMqttLog);
 
   webServer.on("/update", HTTP_GET, handleOTAPage);
 
