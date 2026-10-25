@@ -3,7 +3,7 @@ void sendUDP(char *data) {
   Udp.write(data);
   Udp.endPacket();
 }
-void sendUDP(byte cmd, int data1 = 0, int data2 = 0, int data3 = 0) {
+void sendUDP(byte cmd, int data1, int data2, int data3) {
   char reply[20] = "";
   mString packet(reply);
   packet = packet + "GL," + cmd + ',' + data1 + ',' + data2 + ',' + data3;

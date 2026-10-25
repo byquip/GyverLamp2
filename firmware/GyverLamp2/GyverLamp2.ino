@@ -110,6 +110,7 @@
 #include <ESP8266mDNS.h>        // mDNS (hostname.local)
 #define MQTT_MAX_PACKET_SIZE 512
 #include <PubSubClient.h>       // MQTT клиент
+#include "prototypes.h"         // forward declarations
 
 // ------------------- ДАТА --------------------
 Config cfg;
