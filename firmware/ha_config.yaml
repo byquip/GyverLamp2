@@ -1,0 +1,210 @@
+# =====================================================================
+# GyverLamp2 — Home Assistant Configuration
+# =====================================================================
+#
+# SETUP:
+# 1. Replace ALL occurrences of "XXXX" with your lamp's device ID
+#    (last 4 hex digits of chip ID, shown in Serial Monitor on boot)
+# 2. Make sure MQTT broker (Mosquitto) is installed and configured in HA
+# 3. Copy the automations section to your automations.yaml (or HA UI)
+# 4. Copy the dashboard section into a new Lovelace dashboard (YAML mode)
+#
+# The lamp auto-discovers as a light entity. The extra controls
+# (speed, scale, color, preset, schedule, switches) also auto-discover
+# as separate number/switch entities grouped under the same device.
+#
+# MQTT Topics Reference:
+#   gyverlamp2_XXXX/state      — lamp publishes full JSON state
+#   gyverlamp2_XXXX/set        — JSON commands (state, brightness, effect)
+#   gyverlamp2_XXXX/set/speed  — set effect speed (0-255)
+#   gyverlamp2_XXXX/set/scale  — set effect scale (0-255)
+#   gyverlamp2_XXXX/set/color  — set effect color/hue (0-255)
+#   gyverlamp2_XXXX/set/palette — set palette index (1-16)
+#   gyverlamp2_XXXX/set/preset — set preset number (0-39)
+#   gyverlamp2_XXXX/set/work_from — work hours start (0-23)
+#   gyverlamp2_XXXX/set/work_to   — work hours end (0-23)
+#   gyverlamp2_XXXX/set/rotation   — auto rotation ON/OFF
+#   gyverlamp2_XXXX/set/from_center — effect from center ON/OFF
+#   gyverlamp2_XXXX/set/presence   — presence detection ON/OFF
+#   gyverlamp2_XXXX/presence   — receive home/away from HA automation
+#   gyverlamp2_XXXX/timezone   — receive UTC offset in seconds from HA
+#   gyverlamp2_XXXX/availability — online/offline (LWT)
+#
+# =====================================================================
+
+
+# =====================================================================
+# AUTOMATIONS — add to automations.yaml or create via HA UI
+# =====================================================================
+
+automation:
+  # --- Presence: someone arrived home ---
+  - alias: "GyverLamp2 presence - someone home"
+    trigger:
+      - platform: state
+        entity_id: group.all_persons
+        to: "home"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "gyverlamp2_XXXX/presence"
+          payload: "home"
+
+  # --- Presence: nobody home ---
+  - alias: "GyverLamp2 presence - nobody home"
+    trigger:
+      - platform: state
+        entity_id: group.all_persons
+        to: "not_home"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "gyverlamp2_XXXX/presence"
+          payload: "away"
+
+  # --- Timezone sync: push UTC offset on HA start and twice daily ---
+  # This handles DST changes automatically
+  - alias: "GyverLamp2 timezone sync"
+    trigger:
+      - platform: homeassistant
+        event: start
+      - platform: time
+        at: "03:00:00"
+      - platform: time
+        at: "15:00:00"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "gyverlamp2_XXXX/timezone"
+          payload: "{{ now().utcoffset().total_seconds() | int }}"
+
+  # --- Timezone sync: also when MQTT comes online ---
+  - alias: "GyverLamp2 timezone sync on connect"
+    trigger:
+      - platform: mqtt
+        topic: "gyverlamp2_XXXX/availability"
+        payload: "online"
+    action:
+      - delay: "00:00:02"
+      - service: mqtt.publish
+        data:
+          topic: "gyverlamp2_XXXX/timezone"
+          payload: "{{ now().utcoffset().total_seconds() | int }}"
+
+
+# =====================================================================
+# LOVELACE DASHBOARD — paste into a dashboard in YAML mode
+# =====================================================================
+# To create: Settings → Dashboards → Add Dashboard → choose YAML mode
+# Then edit the dashboard YAML and paste the content below.
+#
+# Entity IDs below use the pattern that HA auto-generates from
+# MQTT discovery. If your entity IDs differ, find the correct ones
+# in Settings → Devices → GyverLamp2 XXXX.
+
+views:
+  - title: GyverLamp2
+    icon: mdi:lightbulb
+    cards:
+      # ---- Main Light Control ----
+      - type: light
+        entity: light.gyverlamp2_xxxx
+        name: GyverLamp2
+
+      # ---- Effect Tuning ----
+      - type: entities
+        title: Effect Settings
+        show_header_toggle: false
+        entities:
+          - entity: number.gyverlamp2_xxxx_preset
+            name: Preset
+          - entity: number.gyverlamp2_xxxx_speed
+            name: Speed
+          - entity: number.gyverlamp2_xxxx_scale
+            name: Scale
+          - entity: number.gyverlamp2_xxxx_color
+            name: Color / Hue
+          - entity: switch.gyverlamp2_xxxx_from_center
+            name: From Center
+
+      # ---- Schedule & Automation ----
+      - type: entities
+        title: Schedule & Presence
+        show_header_toggle: false
+        entities:
+          - entity: number.gyverlamp2_xxxx_work_from
+            name: Work Hours Start
+          - entity: number.gyverlamp2_xxxx_work_to
+            name: Work Hours End
+          - entity: switch.gyverlamp2_xxxx_rotation
+            name: Auto Rotation
+          - entity: switch.gyverlamp2_xxxx_presence
+            name: Presence Detection
+
+      # ---- Quick Actions ----
+      - type: horizontal-stack
+        cards:
+          - type: button
+            entity: light.gyverlamp2_xxxx
+            name: "ON"
+            icon: mdi:lightbulb-on
+            tap_action:
+              action: call-service
+              service: light.turn_on
+              service_data:
+                entity_id: light.gyverlamp2_xxxx
+            show_state: false
+          - type: button
+            entity: light.gyverlamp2_xxxx
+            name: "OFF"
+            icon: mdi:lightbulb-off
+            tap_action:
+              action: call-service
+              service: light.turn_off
+              service_data:
+                entity_id: light.gyverlamp2_xxxx
+            show_state: false
+
+      # ---- Effects Quick Select ----
+      - type: horizontal-stack
+        cards:
+          - type: button
+            name: Perlin
+            icon: mdi:waves
+            tap_action:
+              action: call-service
+              service: light.turn_on
+              service_data:
+                entity_id: light.gyverlamp2_xxxx
+                effect: Perlin
+            show_state: false
+          - type: button
+            name: Fire
+            icon: mdi:fire
+            tap_action:
+              action: call-service
+              service: light.turn_on
+              service_data:
+                entity_id: light.gyverlamp2_xxxx
+                effect: Fire
+            show_state: false
+          - type: button
+            name: Confetti
+            icon: mdi:party-popper
+            tap_action:
+              action: call-service
+              service: light.turn_on
+              service_data:
+                entity_id: light.gyverlamp2_xxxx
+                effect: Confetti
+            show_state: false
+          - type: button
+            name: Gradient
+            icon: mdi:gradient-horizontal
+            tap_action:
+              action: call-service
+              service: light.turn_on
+              service_data:
+                entity_id: light.gyverlamp2_xxxx
+                effect: Gradient
+            show_state: false

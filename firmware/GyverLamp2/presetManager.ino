@@ -21,6 +21,7 @@ void changePreset(int dir) {
   holdPresTmr.restart();
   DEBUG("Preset changed to ");
   DEBUGLN(cfg.curPreset);
+  mqttPublishState();
   //}
 }
 
@@ -30,6 +31,7 @@ void setPreset(byte pres) {
   holdPresTmr.restart();
   DEBUG("Preset set to ");
   DEBUGLN(cfg.curPreset);
+  mqttPublishState();
   //}
 }
 
@@ -72,6 +74,7 @@ void setPower(bool state) {
   if (millis() - udpTmr >= 1000) sendToSlaves(0, cfg.state); // пиздец костыль (не отправлять слейвам если команда получена по воздуху)
   DEBUGLN(state ? "Power on" : "Power off");
   digitalWrite(2, HIGH);
+  mqttPublishState();
 }
 
 void fadeDown(uint32_t time) {

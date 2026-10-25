@@ -118,6 +118,7 @@ void parsing() {
         else if (cfg.adcMode == GL_ADC_MIC) switchToMic();
         else disableADC();
         EE_updCfg();
+        mqttPublishState();
         break;
 
       case 2: DEBUGLN("Preset");

@@ -103,6 +103,13 @@ struct Config {
   char pass[32] = "";          // пароль wifi
   byte version = GL_VERSION;
   byte update = 0;
+
+  char webUser[16] = "admin";
+  char webPass[16] = "";
+  byte presenceEnabled = 0;
+  byte presenceHome = 0;
+  byte mqttAutoDisc = 1;
+  byte _reserved[10] = {0};
 };
 
 #define PRES_SIZE 13

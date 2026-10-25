@@ -5,7 +5,7 @@ bool EEpalFlag = false;
 
 void EE_startup() {
   // старт епром
-  EEPROM.begin(1000);   // старт епром
+  EEPROM.begin(1200);   // старт епром
   delay(100);
   if (EEPROM.read(0) != EE_KEY) {
     EEPROM.write(0, EE_KEY);

@@ -52,14 +52,13 @@
 */
 
 // ------------ WiFi AP ------------
-const char AP_NameChar[] = "GyverLamp2";
-const char WiFiPassword[] = "12345678";
+// AP name and password are now generated from chip ID at runtime (see portal.ino)
 
 // ------------ Прочее -------------
 #define GL_VERSION 23       // код версии прошивки
 #define EE_TOUT 30000       // таймаут сохранения епром после изменения, мс
 #define DEBUG_SERIAL_LAMP   // закомментируй чтобы выключить отладку (скорость 115200)
-#define EE_KEY 56           // ключ сброса eeprom
+#define EE_KEY 57           // ключ сброса eeprom
 #define NTP_UPD_PRD 5       // период обновления времени с NTP сервера, минут
 //#define SKIP_WIFI         // пропустить подключение к вафле (для отладки)
 
@@ -106,13 +105,25 @@ const char WiFiPassword[] = "12345678";
 #include "ESP8266httpUpdate.h"  // OTA
 #include "mString.h"      // стринг билдер
 #include "Clap.h"         // обработка хлопков
+#include <ESP8266WebServer.h>   // веб сервер
+#include <DNSServer.h>          // DNS для captive portal
+#include <ESP8266mDNS.h>        // mDNS (hostname.local)
+#define MQTT_MAX_PACKET_SIZE 512
+#include <PubSubClient.h>       // MQTT клиент
 
 // ------------------- ДАТА --------------------
 Config cfg;
 Preset preset[MAX_PRESETS];
 Dawn dawn;
 Palette pal;
-WiFiServer server(80);
+ESP8266WebServer webServer(80);
+DNSServer dnsServer;
+WiFiClient mqttWifiClient;
+PubSubClient mqttClient(mqttWifiClient);
+bool captivePortalActive = false;
+char deviceId[5] = "";
+char apName[20] = "";
+char apPassword[9] = "";
 WiFiUDP Udp;
 WiFiUDP ntpUDP;
 IPAddress broadIP;
@@ -149,16 +160,31 @@ void setup() {
   Serial.begin(115200);
   DEBUGLN();
 #endif
+  generateDeviceId(deviceId);
+  generateApName(apName, deviceId);
+  generateApPassword(apPassword);
+
   startStrip();         // старт ленты
   btn.setLevel(digitalRead(BTN_PIN));   // смотрим что за кнопка
   EE_startup();         // читаем епром
+  initWebCredentials();
 #ifndef SKIP_WIFI
   checkUpdate();        // индикация было ли обновление
   showRGB();            // показываем ргб
   checkGroup();         // показываем или меняем адрес
   checkButton();        // проверяем кнопку на удержание
   startWiFi();          // старт вайфай
-  setupTime();          // выставляем время
+  if (!captivePortalActive) {
+    setupTime();          // выставляем время
+    setupWebOTA();        // веб OTA обновление
+    setupMQTT();          // MQTT для Home Assistant
+    char mdnsName[20];
+    snprintf(mdnsName, sizeof(mdnsName), "gyverlamp2-%s", deviceId);
+    MDNS.begin(mdnsName);
+    DEBUG("mDNS: ");
+    DEBUG(mdnsName);
+    DEBUGLN(".local");
+  }
 #endif
   setupADC();           // настраиваем анализ
   presetRotation(true); // форсировать смену режима
@@ -172,6 +198,12 @@ void setup() {
 }
 
 void loop() {
+#ifndef SKIP_WIFI
+  if (captivePortalActive) {
+    portalLoop();
+    return;
+  }
+#endif
   timeTicker();       // обновляем время
   checkAnalog();
   yield();
@@ -180,6 +212,9 @@ void loop() {
   yield();
   parsing();          // ловим данные
   yield();
+  webServer.handleClient();
+  MDNS.update();
+  mqttLoop();
 #endif
   checkEEupdate();    // сохраняем епром
   presetRotation(0);  // смена режимов по расписанию

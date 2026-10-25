@@ -96,18 +96,23 @@ void setupAP() {
   WiFi.disconnect();
   WiFi.mode(WIFI_AP);
   delay(100);
-  WiFi.softAP(AP_NameChar, WiFiPassword);
-  server.begin();
+  WiFi.softAP(apName, apPassword);
+  webServer.begin();
   DEBUGLN("Setting AP Mode");
+  DEBUG("AP: ");
+  DEBUGLN(apName);
+  DEBUG("AP Password: ");
+  DEBUGLN(apPassword);
   DEBUG("AP IP: ");
   DEBUGLN(WiFi.softAPIP());
   delay(500);
 }
 
 void setupLocal() {
-  if (cfg.ssid[0] == NULL && cfg.pass[0] == NULL) {
-    DEBUGLN("WiFi not configured");
-    setupAP();
+  if (cfg.ssid[0] == 0) {
+    DEBUGLN("WiFi not configured - starting captive portal");
+    startCaptivePortal();
+    return;
   } else {
     DEBUGLN("Connecting to AP...");
     WiFi.softAPdisconnect();
@@ -135,7 +140,7 @@ void setupLocal() {
       if (connect) {
         connTmr.stop();
         blink16(CRGB::Green);
-        server.begin();
+        webServer.begin();
         DEBUG("Connected! Local IP: ");
         DEBUGLN(WiFi.localIP());
         delay(500);

@@ -34,6 +34,7 @@ void timeTicker() {
         if (gotNTP || gotTime) {                // если знаем точное время
           checkWorkTime();                      // проверяем расписание
           checkDawn();                          // и рассвет
+          checkPresence();                      // проверяем присутствие
         }
       }
     }
