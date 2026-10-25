@@ -29,7 +29,7 @@ HEX OS поддерживает Docker. Home Assistant устанавливае�
    - **Имя**: `homeassistant`
    - **Сеть**: `host` (важно! не bridge)
    - **Том**: `/volume1/docker/homeassistant/config` → `/config`
-   - **Переменная окружения**: `TZ=Europe/Moscow` (ваш часовой пояс)
+   - **Переменная окружения**: `TZ=Europe/Paris` (ваш часовой пояс)
    - **Перезапуск**: `always`
 
 **Или через SSH/терминал:**
@@ -39,11 +39,11 @@ docker run -d \
   --restart=always \
   --network=host \
   -v /volume1/docker/homeassistant/config:/config \
-  -e TZ=Europe/Moscow \
+  -e TZ=Europe/Paris \
   ghcr.io/home-assistant/home-assistant:stable
 ```
 
-> Замените `Europe/Moscow` на ваш часовой пояс.
+> Замените `Europe/Paris` на ваш часовой пояс.
 > Список: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 
 ### 1.4. Первый запуск HA
