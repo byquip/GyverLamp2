@@ -76,6 +76,8 @@ String getUptime();
 String templateReplace(const char* html);
 void handleStatusPage();
 void handleOTAPage();
+void handleMqttPage();
+void handleMqttSave();
 void setupWebOTA();
 
 // parsing.ino
